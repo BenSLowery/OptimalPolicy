@@ -1,0 +1,19 @@
+[package]
+name = "optimalpolicy"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "_core"
+# "cdylib" is necessary to produce a shared library for Python to import from.
+crate-type = ["cdylib"]
+
+[dependencies]
+# "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
+# "abi3-py39" tells pyo3 (and maturin) to build using the stable ABI with minimum Python version 3.9
+pyo3 = { version = "0.22.4", features = ["extension-module", "abi3-py39"] }
+statrs = "0.18.0"
+itertools = "0.14"
+memoise = "0.3.2"
+rayon = "1.10.0"
+dashmap = "6.1.0"

@@ -1,0 +1,31 @@
+[project]
+name = "optimalpolicy"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "BenSLowery", email = "benjaminslowery@outlook.com" }
+]
+classifiers = ["Private :: Do Not Upload"]
+requires-python = ">=3.11"
+dependencies = [
+    "scipy>=1.15.2",
+]
+
+[project.scripts]
+optimalpolicy = "optimalpolicy:main"
+
+[tool.maturin]
+module-name = "optimalpolicy._core"
+python-packages = ["optimalpolicy"]
+python-source = "src"
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.uv]
+# Rebuild package when any rust files change
+cache-keys = [{file = "pyproject.toml"}, {file = "rust/Cargo.toml"}, {file = "**/*.rs"}]
+# Uncomment to build rust code in development mode
+config-settings = { build-args = '--profile=dev' }
