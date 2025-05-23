@@ -26,150 +26,150 @@ pub const D_MAX: usize = 25;
 // }
 
 
-#[pyfunction]
-#[pyo3(signature = (state, sa_demand_param_one, sb_demand_param_one, h_w, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None))]
-fn expectation_warehouse(state: (usize,usize,usize), sa_demand_param_one: f64, sb_demand_param_one: f64, h_w: f64, p: Option<f64>, sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>) -> PyResult<f64> {
-    // Generate required parameters and pmf's
-    let dfw_p: f64 = p.unwrap_or(0.8);
+// #[pyfunction]
+// #[pyo3(signature = (state, sa_demand_param_one, sb_demand_param_one, h_w, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None))]
+// fn expectation_warehouse(state: (usize,usize,usize), sa_demand_param_one: f64, sb_demand_param_one: f64, h_w: f64, p: Option<f64>, sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>) -> PyResult<f64> {
+//     // Generate required parameters and pmf's
+//     let dfw_p: f64 = p.unwrap_or(0.8);
 
 
-    // Pregenerate the binomial distribution pmf's for all situations
-    // We know the max it can be is the max demand and the min is 0
-    let mut binom_pmf = [[0.0; D_MAX+1]; D_MAX+1];
-    for i in 0..D_MAX+1 {
-        let binom_distr = Binomial::new(dfw_p, i as u64).unwrap();
-        for j in 0..D_MAX+1 {
-            binom_pmf[i][j] = (binom_distr.pmf(j as u64)) as f64;
-        }
-    }
+//     // Pregenerate the binomial distribution pmf's for all situations
+//     // We know the max it can be is the max demand and the min is 0
+//     let mut binom_pmf = [[0.0; D_MAX+1]; D_MAX+1];
+//     for i in 0..D_MAX+1 {
+//         let binom_distr = Binomial::new(dfw_p, i as u64).unwrap();
+//         for j in 0..D_MAX+1 {
+//             binom_pmf[i][j] = (binom_distr.pmf(j as u64)) as f64;
+//         }
+//     }
  
-    // Generate demand pmfs
-    let dist: char = distribution.unwrap_or('P');
-    let da_pmf: [f64; D_MAX] = rust::distributions::generate_distributions::distribution_pmf(dist, sa_demand_param_one, sa_demand_param_two);
-    let db_pmf: [f64; D_MAX] = rust::distributions::generate_distributions::distribution_pmf(dist, sb_demand_param_one, sb_demand_param_two);
+//     // Generate demand pmfs
+//     let dist: char = distribution.unwrap_or('P');
+//     let da_pmf: [f64; D_MAX] = rust::distributions::generate_distributions::distribution_pmf(dist, sa_demand_param_one, sa_demand_param_two);
+//     let db_pmf: [f64; D_MAX] = rust::distributions::generate_distributions::distribution_pmf(dist, sb_demand_param_one, sb_demand_param_two);
 
-    // Calculate the expectation
-    let mut exp: f64 = 0.0;
+//     // Calculate the expectation
+//     let mut exp: f64 = 0.0;
 
-       // First stage shortage
-    for (da_val,da_pmf_i) in da_pmf.iter().enumerate() {
-        let max_beta_sa: usize = min(max(da_val as isize - state.1 as isize,0), state.0 as isize)as usize;
-        for (db_val,db_pmf_i) in db_pmf.iter().enumerate() {
-            for j in 0..max_beta_sa+1 {
-                let max_beta_sb: usize = min(max(db_val as isize - state.2 as isize,0), (state.0-j) as isize) as usize;
-                for k in 0..max_beta_sb+1 {
-                    let fs = da_pmf_i * db_pmf_i * binom_pmf[max_beta_sa][j] * binom_pmf[max_beta_sb][k] * h_w * (state.0 - (j+k)) as f64;
-                    exp += fs;
-                }
-            }
-        }
-    }
+//        // First stage shortage
+//     for (da_val,da_pmf_i) in da_pmf.iter().enumerate() {
+//         let max_beta_sa: usize = min(max(da_val as isize - state.1 as isize,0), state.0 as isize)as usize;
+//         for (db_val,db_pmf_i) in db_pmf.iter().enumerate() {
+//             for j in 0..max_beta_sa+1 {
+//                 let max_beta_sb: usize = min(max(db_val as isize - state.2 as isize,0), (state.0-j) as isize) as usize;
+//                 for k in 0..max_beta_sb+1 {
+//                     let fs = da_pmf_i * db_pmf_i * binom_pmf[max_beta_sa][j] * binom_pmf[max_beta_sb][k] * h_w * (state.0 - (j+k)) as f64;
+//                     exp += fs;
+//                 }
+//             }
+//         }
+//     }
 
-    Ok(exp)
-}
+//     Ok(exp)
+// }
 
 
-#[pyfunction]
-#[pyo3(signature = (state, sa_demand_param_one, sb_demand_param_one, h_s, c_u_s, c_p, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None))]
-fn expectation_store(state: (usize,usize,usize), sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, c_u_s: f64, c_p: f64, p: Option<f64>, sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>) -> PyResult<f64> {
-    // Generate required parameters and pmf's
-    let dfw_p: f64 = p.unwrap_or(0.8);
+// #[pyfunction]
+// #[pyo3(signature = (state, sa_demand_param_one, sb_demand_param_one, h_s, c_u_s, c_p, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None))]
+// fn expectation_store(state: (usize,usize,usize), sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, c_u_s: f64, c_p: f64, p: Option<f64>, sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>) -> PyResult<f64> {
+//     // Generate required parameters and pmf's
+//     let dfw_p: f64 = p.unwrap_or(0.8);
     
-    // Pregenerate the binomial distribution pmf's for all situations
-    // We know the max it can be is the max demand and the min is 0
-    let mut binom_pmf = [[0.0; D_MAX+1]; D_MAX+1];
-    for i in 0..D_MAX+1 {
-        let binom_distr = Binomial::new(dfw_p, i as u64).unwrap();
-        for j in 0..D_MAX+1 {
-            binom_pmf[i][j] = (binom_distr.pmf(j as u64)) as f64;
-        }
-    }
+//     // Pregenerate the binomial distribution pmf's for all situations
+//     // We know the max it can be is the max demand and the min is 0
+//     let mut binom_pmf = [[0.0; D_MAX+1]; D_MAX+1];
+//     for i in 0..D_MAX+1 {
+//         let binom_distr = Binomial::new(dfw_p, i as u64).unwrap();
+//         for j in 0..D_MAX+1 {
+//             binom_pmf[i][j] = (binom_distr.pmf(j as u64)) as f64;
+//         }
+//     }
  
-    // Generate demand pmfs
-    let dist: char = distribution.unwrap_or('P');
-    let da_pmf: [f64; D_MAX] = rust::distributions::generate_distributions::distribution_pmf(dist, sa_demand_param_one, sa_demand_param_two);
-    let db_pmf: [f64; D_MAX] = rust::distributions::generate_distributions::distribution_pmf(dist, sb_demand_param_one, sb_demand_param_two);
+//     // Generate demand pmfs
+//     let dist: char = distribution.unwrap_or('P');
+//     let da_pmf: [f64; D_MAX] = rust::distributions::generate_distributions::distribution_pmf(dist, sa_demand_param_one, sa_demand_param_two);
+//     let db_pmf: [f64; D_MAX] = rust::distributions::generate_distributions::distribution_pmf(dist, sb_demand_param_one, sb_demand_param_two);
     
-    let mut exp = 0.0;
-    // Calculate the expectation
-    // Due to fulfilment of excess demand being indifferent as to the location (since costs and lead-time are identical) we deal with store 1 first then store 2.
-    for (da_val,da_pmf_i) in da_pmf.iter().enumerate() {
-        // Add holding cost of excess demand
-        if (state.1 as isize - da_val as isize) >= 0 {
-            exp += da_pmf_i * h_s * (state.1 as f64 - da_val as f64);
-        } else {
-            let excess = da_val as isize - state.1 as isize;
-            // See how much stock we can fulfil from the warehouse
-            let max_beta_sa: usize = min(max(excess,0), state.0 as isize)as usize;
-            for j in 0..max_beta_sa+1 {
-                let unfulfilled = excess - j as isize;
-                exp += da_pmf_i*binom_pmf[max_beta_sa][j]*(c_p*j as f64+unfulfilled as f64*c_u_s) as f64;
-            }
-        }
+//     let mut exp = 0.0;
+//     // Calculate the expectation
+//     // Due to fulfilment of excess demand being indifferent as to the location (since costs and lead-time are identical) we deal with store 1 first then store 2.
+//     for (da_val,da_pmf_i) in da_pmf.iter().enumerate() {
+//         // Add holding cost of excess demand
+//         if (state.1 as isize - da_val as isize) >= 0 {
+//             exp += da_pmf_i * h_s * (state.1 as f64 - da_val as f64);
+//         } else {
+//             let excess = da_val as isize - state.1 as isize;
+//             // See how much stock we can fulfil from the warehouse
+//             let max_beta_sa: usize = min(max(excess,0), state.0 as isize)as usize;
+//             for j in 0..max_beta_sa+1 {
+//                 let unfulfilled = excess - j as isize;
+//                 exp += da_pmf_i*binom_pmf[max_beta_sa][j]*(c_p*j as f64+unfulfilled as f64*c_u_s) as f64;
+//             }
+//         }
 
-    }
+//     }
 
-    for (db_val,db_pmf_i) in db_pmf.iter().enumerate() {
-        // Add holding cost of excess demand
-        if (state.2 as isize - db_val as isize) >= 0 {
-            exp += db_pmf_i * h_s * (state.2 as f64 - db_val as f64);
-        } else {
-            // See how much stock we can fulfil from the warehouse
-            // Need to take into accoutn how much we expect to be taken up by store 1
-            for (da_val,da_pmf_i) in da_pmf.iter().enumerate() {
-                if (state.1 as isize - da_val as isize) >= 0 {
-                    // In this case store 1 took no stock from the warehouse
-                    // Carry on with the procedure
-                    let remaining_warehouse_stock = state.0;
-                    let excess = db_val as isize - state.2 as isize;
-                    // See how much stock we can fulfil from the warehouse
-                    let max_beta_sb: usize = min(max(excess,0), remaining_warehouse_stock as isize)as usize;
-                    for j in 0..max_beta_sb+1 {
-                            let unfulfilled = excess - j as isize;
-                            exp += da_pmf_i*db_pmf_i*binom_pmf[max_beta_sb][j]*(c_p*j as f64+unfulfilled as f64*c_u_s) as f64;
-                    }
+//     for (db_val,db_pmf_i) in db_pmf.iter().enumerate() {
+//         // Add holding cost of excess demand
+//         if (state.2 as isize - db_val as isize) >= 0 {
+//             exp += db_pmf_i * h_s * (state.2 as f64 - db_val as f64);
+//         } else {
+//             // See how much stock we can fulfil from the warehouse
+//             // Need to take into accoutn how much we expect to be taken up by store 1
+//             for (da_val,da_pmf_i) in da_pmf.iter().enumerate() {
+//                 if (state.1 as isize - da_val as isize) >= 0 {
+//                     // In this case store 1 took no stock from the warehouse
+//                     // Carry on with the procedure
+//                     let remaining_warehouse_stock = state.0;
+//                     let excess = db_val as isize - state.2 as isize;
+//                     // See how much stock we can fulfil from the warehouse
+//                     let max_beta_sb: usize = min(max(excess,0), remaining_warehouse_stock as isize)as usize;
+//                     for j in 0..max_beta_sb+1 {
+//                             let unfulfilled = excess - j as isize;
+//                             exp += da_pmf_i*db_pmf_i*binom_pmf[max_beta_sb][j]*(c_p*j as f64+unfulfilled as f64*c_u_s) as f64;
+//                     }
                     
-                } else {
-                    let excess_s1 = da_val as isize - state.1 as isize;
-                    // See how much stock we can fulfil from the warehouse
-                    let max_beta_sa: usize = min(max(excess_s1,0), state.0 as isize)as usize;
-                    for j in 0..max_beta_sa+1 {
-                        // Number of remaining stock we can fulfil from the warehouse
-                        let remaining_warehouse_stock = state.0 - j;
-                        let excess = db_val as isize - state.2 as isize;
-                        // See how much stock we can fulfil from the warehouse
-                        let max_beta_sb: usize = min(max(excess,0), remaining_warehouse_stock as isize)as usize;
-                        for k in 0..max_beta_sb+1 {
-                                let unfulfilled = excess - k as isize;
-                                exp += da_pmf_i*db_pmf_i*binom_pmf[max_beta_sb][k]*(c_p*k as f64+unfulfilled as f64*c_u_s) as f64;
-                        }
-                    }
+//                 } else {
+//                     let excess_s1 = da_val as isize - state.1 as isize;
+//                     // See how much stock we can fulfil from the warehouse
+//                     let max_beta_sa: usize = min(max(excess_s1,0), state.0 as isize)as usize;
+//                     for j in 0..max_beta_sa+1 {
+//                         // Number of remaining stock we can fulfil from the warehouse
+//                         let remaining_warehouse_stock = state.0 - j;
+//                         let excess = db_val as isize - state.2 as isize;
+//                         // See how much stock we can fulfil from the warehouse
+//                         let max_beta_sb: usize = min(max(excess,0), remaining_warehouse_stock as isize)as usize;
+//                         for k in 0..max_beta_sb+1 {
+//                                 let unfulfilled = excess - k as isize;
+//                                 exp += da_pmf_i*db_pmf_i*binom_pmf[max_beta_sb][k]*(c_p*k as f64+unfulfilled as f64*c_u_s) as f64;
+//                         }
+//                     }
                         
-                }
-            }
-        }
+//                 }
+//             }
+//         }
 
-    }
+//     }
 
-    Ok(exp)
-}
+//     Ok(exp)
+// }
 
 
-#[pyfunction]
-#[pyo3(signature = (sa_demand_param_one, sb_demand_param_one, h_s, h_w,c_u_s, c_p, c_ts, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10))]
-fn pre_calculate_warehouse_costs(sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>) -> PyResult<HashMap<(usize,usize,usize),f64>>{
-    let policy_constructor = OptimalPolicy::new(sa_demand_param_one, sb_demand_param_one, h_s, h_w, c_u_s, c_p, c_ts, p, sa_demand_param_two, sb_demand_param_two, distribution, max_wh, max_sa, max_sb);
-    let warehouse_dict = policy_constructor.expectation_all_warehouse();
-    Ok(warehouse_dict)
-}
+// #[pyfunction]
+// #[pyo3(signature = (sa_demand_param_one, sb_demand_param_one, h_s, h_w,c_u_s, c_p, c_ts, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10))]
+// fn pre_calculate_warehouse_costs(sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>) -> PyResult<HashMap<(usize,usize,usize),f64>>{
+//     let policy_constructor = OptimalPolicy::new(sa_demand_param_one, sb_demand_param_one, h_s, h_w, c_u_s, c_p, c_ts, p, sa_demand_param_two, sb_demand_param_two, distribution, max_wh, max_sa, max_sb);
+//     let warehouse_dict = policy_constructor.expectation_all_warehouse();
+//     Ok(warehouse_dict)
+// }
 
-#[pyfunction]
-#[pyo3(signature = (sa_demand_param_one, sb_demand_param_one, h_s,h_w, c_u_s, c_p, c_ts, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10))]
-fn pre_calculate_store_costs(sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>) -> PyResult<HashMap<(usize,usize,usize),f64>> {
-    let policy_constructor = OptimalPolicy::new(sa_demand_param_one, sb_demand_param_one, h_s, h_w, c_u_s, c_p, c_ts, p, sa_demand_param_two, sb_demand_param_two, distribution, max_wh, max_sa, max_sb);
-    let store_dict = policy_constructor.expectation_all_stores();
-    Ok(store_dict)
-}
+// #[pyfunction]
+// #[pyo3(signature = (sa_demand_param_one, sb_demand_param_one, h_s,h_w, c_u_s, c_p, c_ts, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10))]
+// fn pre_calculate_store_costs(sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>) -> PyResult<HashMap<(usize,usize,usize),f64>> {
+//     let policy_constructor = OptimalPolicy::new(sa_demand_param_one, sb_demand_param_one, h_s, h_w, c_u_s, c_p, c_ts, p, sa_demand_param_two, sb_demand_param_two, distribution, max_wh, max_sa, max_sb);
+//     let store_dict = policy_constructor.expectation_all_stores();
+//     Ok(store_dict)
+// }
 
 /// EVERYTHING BELOW THIS LINE IS FOR THE OPTIMAL POLICY FUNCTION
 /// 
@@ -186,11 +186,12 @@ struct OptimalPolicy {
     max_wh: usize,
     max_sa: usize,
     max_sb: usize,
+    gamma: f64
 
 }
 
 impl OptimalPolicy {
-    fn new(sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>) -> Self {
+    fn new(sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>, gamma: Option<f64>) -> Self {
         // Assign optional parameters
         let p: f64 = p.unwrap_or(0.8);
         let distribution: char = distribution.unwrap_or('P');
@@ -204,7 +205,7 @@ impl OptimalPolicy {
             }
         }
 
-        OptimalPolicy {h_s, h_w, c_u_s, c_p, c_ts, da_pmf, db_pmf, binom_pmf, max_wh: max_wh.unwrap_or(20), max_sa: max_sa.unwrap_or(10), max_sb: max_sb.unwrap_or(10)}
+        OptimalPolicy {h_s, h_w, c_u_s, c_p, c_ts, da_pmf, db_pmf, binom_pmf, max_wh: max_wh.unwrap_or(20), max_sa: max_sa.unwrap_or(10), max_sb: max_sb.unwrap_or(10), gamma: gamma.unwrap_or(0.99)}
     }
 
     // Function to generate the state space
@@ -474,7 +475,7 @@ fn value_function(policy : &OptimalPolicy, pre_action_state: (usize,usize,usize)
             pre_action_state.2-t_b_to_a+t_a_to_b // Store B
         );
         let im_cost = policy.c_ts*(t_a_to_b+t_b_to_a) as f64 + warehouse_expectation[&post_state] + store_expectation[&post_state];
-        let fut_cost: f64 = future_costs(policy, post_state, (*wh_order, *st_a_order, *st_b_order), v_t_plus_1);
+        let fut_cost: f64 = policy.gamma*future_costs(policy, post_state, (*wh_order, *st_a_order, *st_b_order), v_t_plus_1);
         let total_cost = im_cost + fut_cost;
         if best_action.is_none() || total_cost < best_action.unwrap().1 {
             best_action = Some(((*wh_order, *st_a_order, *st_b_order, *t_a_to_b, *t_b_to_a), total_cost));
@@ -484,10 +485,10 @@ fn value_function(policy : &OptimalPolicy, pre_action_state: (usize,usize,usize)
 }
 
 #[pyfunction]
-#[pyo3(signature = (periods,sa_demand_param_one, sb_demand_param_one, h_s,h_w, c_u_s, c_p, c_ts, num_cores=4, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10))]
-fn optimal_policy_par(periods: usize, sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, num_cores: Option<usize>, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>) -> PyResult<(HashMap<(usize, usize, usize, usize), (usize, usize, usize, usize, usize)>, HashMap<(usize, usize, usize), f64>)> {
+#[pyo3(signature = (periods,sa_demand_param_one, sb_demand_param_one, h_s,h_w, c_u_s, c_p, c_ts, num_cores=4, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10, gamma=0.99))]
+fn optimal_policy_par(periods: usize, sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, num_cores: Option<usize>, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>, gamma: Option<f64>) -> PyResult<(HashMap<(usize, usize, usize, usize), (usize, usize, usize, usize, usize)>, HashMap<(usize, usize, usize), f64>)> {
     // Stores all the infrastructure for the parameters in the optimal policy
-    let policy_constructor = OptimalPolicy::new(sa_demand_param_one, sb_demand_param_one, h_s, h_w, c_u_s, c_p, c_ts, p, sa_demand_param_two, sb_demand_param_two, distribution, max_wh, max_sa, max_sb);
+    let policy_constructor = OptimalPolicy::new(sa_demand_param_one, sb_demand_param_one, h_s, h_w, c_u_s, c_p, c_ts, p, sa_demand_param_two, sb_demand_param_two, distribution, max_wh, max_sa, max_sb, gamma);
     let store_expectation = policy_constructor.expectation_all_stores();
     let warehouse_expectation = policy_constructor.expectation_all_warehouse();
     let action_space = policy_constructor.construct_action_space();
@@ -528,10 +529,10 @@ fn optimal_policy_par(periods: usize, sa_demand_param_one: f64, sb_demand_param_
 }
 
 #[pyfunction]
-#[pyo3(signature = (periods,sa_demand_param_one, sb_demand_param_one, h_s,h_w, c_u_s, c_p, c_ts, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10))]
-fn optimal_policy(periods: usize, sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>) -> PyResult<(HashMap<(usize, usize, usize, usize), (usize, usize, usize, usize, usize)>, HashMap<(usize, usize, usize), f64>)> {
+#[pyo3(signature = (periods,sa_demand_param_one, sb_demand_param_one, h_s,h_w, c_u_s, c_p, c_ts, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10, gamma=0.99))]
+fn optimal_policy(periods: usize, sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>, gamma: Option<f64>) -> PyResult<(HashMap<(usize, usize, usize, usize), (usize, usize, usize, usize, usize)>, HashMap<(usize, usize, usize), f64>)> {
     // Stores all the infrastructure for the parameters in the optimal policy
-    let policy_constructor = OptimalPolicy::new(sa_demand_param_one, sb_demand_param_one, h_s, h_w, c_u_s, c_p, c_ts, p, sa_demand_param_two, sb_demand_param_two, distribution, max_wh, max_sa, max_sb);
+    let policy_constructor = OptimalPolicy::new(sa_demand_param_one, sb_demand_param_one, h_s, h_w, c_u_s, c_p, c_ts, p, sa_demand_param_two, sb_demand_param_two, distribution, max_wh, max_sa, max_sb,gamma);
     let store_expectation = policy_constructor.expectation_all_stores();
     let warehouse_expectation = policy_constructor.expectation_all_warehouse();
     let action_space = policy_constructor.construct_action_space();
@@ -573,9 +574,9 @@ fn optimal_policy(periods: usize, sa_demand_param_one: f64, sb_demand_param_one:
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(optimal_policy, m)?)?;
     m.add_function(wrap_pyfunction!(optimal_policy_par, m)?)?;
-    m.add_function(wrap_pyfunction!(pre_calculate_store_costs, m)?)?;
-    m.add_function(wrap_pyfunction!(pre_calculate_warehouse_costs, m)?)?;
-    m.add_function(wrap_pyfunction!(expectation_warehouse, m)?)?;
-    m.add_function(wrap_pyfunction!(expectation_store, m)?)?;
+    //m.add_function(wrap_pyfunction!(pre_calculate_store_costs, m)?)?;
+    //m.add_function(wrap_pyfunction!(pre_calculate_warehouse_costs, m)?)?;
+    //m.add_function(wrap_pyfunction!(expectation_warehouse, m)?)?;
+    //m.add_function(wrap_pyfunction!(expectation_store, m)?)?;
     Ok(())
 }
