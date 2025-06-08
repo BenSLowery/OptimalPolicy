@@ -1,3 +1,8 @@
+//////////////////
+//   Contains initialisation for an inventory policy
+//   Used a as a basis for calculating an optimal policy or evaluating a policy
+//////////////////
+
 use crate::rust;
 //use itertools::Itertools;
 use pyo3::prelude::*;
