@@ -30,6 +30,7 @@ pub struct OptimalPolicy {
 
 }
 
+
 impl OptimalPolicy {
     pub fn new(sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>, gamma: Option<f64>) -> Self {
         // Assign optional parameters
@@ -85,13 +86,17 @@ impl OptimalPolicy {
             let new_state = (state.0, state.1 - t_a_to_b + t_b_to_a, state.2 - t_b_to_a + t_a_to_b);
             
             // Go through valid orders
-            for order_st_a in 0..max(min(self.max_sa-new_state.1,max(new_state.0 as isize-new_state.1 as isize,0) as usize),1) {
-                for order_st_b in 0..max(min(self.max_sb-new_state.2,max(new_state.0 as isize-new_state.2 as isize,0) as usize),1) {
-                    // Check if the order is valid
-                    if order_st_a + order_st_b <= new_state.0 {
-                        for wh_order in 0..self.max_wh-new_state.0 {
-                            action_space.push((wh_order,order_st_a, order_st_b, t_a_to_b, t_b_to_a));
-                        }   
+            for order_st_a in 0..max(new_state.0+1,1) {
+                if order_st_a+new_state.1 < self.max_sa {
+                    for order_st_b in 0..max(new_state.0+1,1) {
+                        if order_st_b + new_state.2 < self.max_sb {
+                            // Check if the order is valid
+                            if order_st_a + order_st_b <= new_state.0 {
+                                for wh_order in 0..self.max_wh-new_state.0 {
+                                    action_space.push((wh_order,order_st_a, order_st_b, t_a_to_b, t_b_to_a));
+                                }   
+                            }
+                        }
                     }
                 }
             }

@@ -84,12 +84,10 @@ pub fn future_costs(policy: &rust::policy_contructor::OptimalPolicy, state: (usi
                 let sa_post_demand = max(state.1 as isize - da_val as isize,0) as usize + orders.1;
                 if (state.1 as isize - da_val as isize) >= 0 {
                     // In this case store a took no stock from the warehouse
-                    // Carry on with the procedure
-                    let remaining_warehouse_stock = state.0;
                     let excess = db_val as isize - state.2 as isize;
                     // See how much stock we can fulfil from the warehouse
-                    let max_beta_sb: usize = min(max(excess,0), remaining_warehouse_stock as isize)as usize;
-                    let sb_post_demand = max(state.2 as isize - db_val as isize,0) as usize + orders.2;
+                    let max_beta_sb: usize = min(max(excess,0), state.0 as isize)as usize;
+                    //let sb_post_demand = max(state.2 as isize - db_val as isize,0) as usize + orders.2;
                             
                     for j in 0..max_beta_sb+1 {
                             let wh_post_demand = state.0 - j + orders.0;
@@ -102,7 +100,7 @@ pub fn future_costs(policy: &rust::policy_contructor::OptimalPolicy, state: (usi
                     let sa_post_demand = max(state.1 as isize - da_val as isize,0) as usize + orders.1;
                     // See how much stock we can fulfil from the warehouse
                     let max_beta_sa: usize = min(max(excess_s1,0), state.0 as isize)as usize;
-                    let sb_post_demand = max(state.2 as isize - db_val as isize,0) as usize + orders.2;
+                    //let sb_post_demand = max(state.2 as isize - db_val as isize,0) as usize + orders.2;
                         
                     for j in 0..max_beta_sa+1 {
                         // Number of remaining stock we can fulfil from the warehouse

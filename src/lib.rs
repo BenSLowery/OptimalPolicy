@@ -70,10 +70,7 @@ fn policy_evaluation_par_bs(periods: usize, sa_demand_param_one: f64, sb_demand_
 
 
 
-// Policy evaluation given a regular base-stock policy for the action.
-// TODO: add in transhipment base-stock policies.
-// Need to include a variety of different policies.
-// Once this is done you just need to call rust::value_function::value_function_pol_eval and pass the normal constructors + action
+// Policy evaluation of the optimal action
 #[pyfunction]
 #[pyo3(signature = (periods,sa_demand_param_one, sb_demand_param_one, h_s,h_w, c_u_s, c_p, c_ts, optimal_actions,num_cores=4, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10, gamma=0.99))]
 fn policy_evaluation_par_opt(periods: usize, sa_demand_param_one: f64, sb_demand_param_one: f64, h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64,  optimal_actions:HashMap<(usize, usize, usize,usize), (usize, usize, usize, usize, usize)>, num_cores: Option<usize>, p: Option<f64>,sa_demand_param_two: Option<f64>, sb_demand_param_two: Option<f64>, distribution: Option<char>, max_wh: Option<usize>, max_sa: Option<usize>, max_sb: Option<usize>, gamma: Option<f64>) -> PyResult<HashMap<(usize, usize, usize), f64>> {
@@ -129,6 +126,8 @@ fn optimal_policy_par(periods: usize, sa_demand_param_one: f64, sb_demand_param_
     let warehouse_expectation = policy_constructor.expectation_all_warehouse();
     let action_space = policy_constructor.construct_action_space();
 
+    //println!("{:?}",action_space);
+
     // Create the thread pool
     rayon::ThreadPoolBuilder::new().num_threads(num_cores.unwrap_or(4)).build().unwrap();
 
@@ -137,7 +136,7 @@ fn optimal_policy_par(periods: usize, sa_demand_param_one: f64, sb_demand_param_
     let optimal_pol: DashMap<(usize, usize, usize, usize), (usize, usize, usize, usize, usize)> = DashMap::new();
     // Iterate through periods
     for t in (1..periods).rev() {
-        //println!("Period: {:?}",t);
+        println!("Period: {:?}",t);
         // Save previous iteration (v_t+1)
         let v_plus_1 = v.clone();
         //v.clear(); // Reset V to repopulate
@@ -145,6 +144,7 @@ fn optimal_policy_par(periods: usize, sa_demand_param_one: f64, sb_demand_param_
         // Iterate through all states
         let state_space: Vec<(usize,usize,usize)> = policy_constructor.construct_state_space_iterator().collect();
         //println!("Length of state space: {:?}",state_space.len());
+        
         state_space.clone().par_iter().for_each(|state| {
             //println!("Testing state {:?} out of {:?}. Current: {:?}",state, state_space.len(), state);
             let state = (state.0, state.1, state.2);
