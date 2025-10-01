@@ -15,10 +15,10 @@ pub fn regular_base_stock(state: (usize, usize, usize), warehouse_bs: usize, sto
     (wh_order, desired_sa, desired_sb)
 }
 
-pub fn echelon_base_stock() -> Result<u64, ()> {
-    // Placeholder for the echelon base stock policy
-    unimplemented!("Echelon base stock policy is not implemented yet");
-}
+// pub fn echelon_base_stock() -> Result<u64, ()> {
+//     // Placeholder for the echelon base stock policy
+//     unimplemented!("Echelon base stock policy is not implemented yet");
+// }
 
 pub fn allocate_stock(wh_state: usize, sa_request: usize, sb_request: usize) -> (usize, usize) {
     let mut sa_alloc = 0;
