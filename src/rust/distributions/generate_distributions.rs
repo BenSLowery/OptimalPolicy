@@ -36,3 +36,17 @@ pub fn distribution_pmf(dist_type: char, param_1: f64, param_2: Option<f64>) -> 
         panic!("Distribution type not recognised");
     }
 }
+
+pub fn distribution_mean(dist_type: char, param_1: f64, param_2: Option<f64>) -> f64 {
+    if dist_type == 'P' {
+        // Poisson
+        return param_1;
+    } else if dist_type == 'N' {
+        // Negative Binomial    
+        let param_2 = param_2.expect("You need to provide a second parameter for the negative binomial distribution");
+        return (param_1*(1.0-param_2))/param_2;
+    } else {
+        panic!("Distribution type not recognised");
+    }
+
+}

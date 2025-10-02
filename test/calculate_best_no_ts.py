@@ -13,11 +13,12 @@ dfw = 0.2
 cores = 3
 
 for c_h in [3]:
-    for dfw in [0.2, 0.5, 0.8]:
+    for dfw in [0.8]:
         print('Calculating for c_h={}, dfw={}'.format(c_h, dfw))
         pol_eval_res = {}
-        for wh in [6,7,8,9,10]: 
-            for alpha in [0.4, 0.45, 0.5, 0.55, 0.6, 0.75]:
+        for wh in [13]: 
+            for alpha in [0.4]:
+                print('Calculating for wh={}, alpha={}'.format(wh, alpha))
                 sa = int(sp.poisson(sa_demand*2).ppf(alpha))
                 sb = int(sp.poisson(sb_demand*2).ppf(alpha))
                 pol, val_bs = rust_helpers.policy_evaluation_par_bs(
@@ -35,10 +36,8 @@ for c_h in [3]:
                     max_wh=14,
                     max_sa=20,
                     max_sb=15,
+                    transhipment_policy='T',
                     gamma=0.999
                 )
                 pol_eval_res['({},{})'.format(wh,alpha)] = (min(val_bs, key=val_bs.get),val_bs[min(val_bs, key=val_bs.get)])
-        with open("demofile.txt", "a") as f:
-            f.write('({},{})'.format(c_h, dfw))
-            f.write(str(pol_eval_res))
-            print(pol_eval_res)
+        pickle.dump(pol,open('res.pkl','wb'))
