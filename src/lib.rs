@@ -2,6 +2,7 @@
 use dashmap::DashMap;
 use pyo3::prelude::*;
 use rayon::prelude::*;
+
 use std::collections::HashMap;
 use std::usize;
 
@@ -40,6 +41,7 @@ fn policy_evaluation_par_bs(
     HashMap<(usize, usize, usize, usize), (usize, usize, usize, usize, usize)>,
     HashMap<(usize, usize, usize), f64>,
 )> {
+    let base_stock_policy = base_stock_vals.unwrap_or((14, 7, 7));
     // Stores all the infrastructure for the parameters in the optimal policy
     let policy_constructor = rust::policy_contructor::OptimalPolicy::new(
         sa_demand_param_one,
@@ -49,6 +51,8 @@ fn policy_evaluation_par_bs(
         c_u_s,
         c_p,
         c_ts,
+        base_stock_policy.1,
+        base_stock_policy.2,
         p,
         sa_demand_param_two,
         sb_demand_param_two,
@@ -56,11 +60,22 @@ fn policy_evaluation_par_bs(
         max_wh,
         max_sa,
         max_sb,
-        gamma,
+        gamma
     );
     let store_expectation = policy_constructor.expectation_all_stores();
     let warehouse_expectation = policy_constructor.expectation_all_warehouse();
-    let base_stock_policy = base_stock_vals.unwrap_or((14, 7, 7));
+    
+    // Implement transhipment policy
+    // Can be 'N' - No transhipment, 'T' - TIE, 'E' - ESR or 'L' - Lookahead Policy
+    let transhipment_policy = transhipment_policy.unwrap_or('N');
+
+
+    // generate the one step ahead expectations to use later (pregenerated hashmap for easier reading)
+    let one_step_ahead_expectations = if transhipment_policy == 'E' {
+            policy_constructor.all_one_step_ahead_out()
+        } else {
+            HashMap::new() // Create empty hashmap if not needed
+        };
 
     let store_a_expectation_mean = rust::distributions::generate_distributions::distribution_mean(
         distribution.unwrap_or('P'),
@@ -106,18 +121,17 @@ fn policy_evaluation_par_bs(
                 .collect::<HashMap<(usize, usize, usize), f64>>();
             
             
-            // Implement transhipment policy
-            // Can be 'N' - No transhipment, 'T' - TIE, 'E' - ESR or 'L' - Lookahead Policy
-            let transhipment_policy = transhipment_policy.unwrap_or('N');
-
             let transhipment_action: (usize, usize) = if transhipment_policy == 'N' {
                 (0 as usize, 0 as usize)
             } else if transhipment_policy == 'T' {
                 rust::policies::tie::calculate_tie(state.1, state.2, store_a_expectation_mean, store_b_expectation_mean, max_sa.unwrap_or(10), max_sb.unwrap_or(10))
+            } else if transhipment_policy == 'E' {
+                let final_period = t == periods-1;
+                rust::policies::esr::calculate_esr(&policy_constructor, &one_step_ahead_expectations, state.1, state.2, base_stock_policy.1, base_stock_policy.2, final_period)
             } else {
                 (0 as usize, 0 as usize) // Placeholder for now
             };
-
+            // println!("State: {:?}, Transhipment action: {:?}", state, transhipment_action);
             let ordering_action: (usize, usize, usize) =
                 rust::policies::base_stock::regular_base_stock(
                     (state.0, state.1-transhipment_action.0+transhipment_action.1, state.2-transhipment_action.1+transhipment_action.0),
@@ -199,6 +213,8 @@ fn policy_evaluation_par_opt(
         c_u_s,
         c_p,
         c_ts,
+        0, // Optinal doesn't need base-stock in the policy construcutor
+        0, // Optinal doesn't need base-stock in the policy construcutor
         p,
         sa_demand_param_two,
         sb_demand_param_two,
@@ -241,7 +257,6 @@ fn policy_evaluation_par_opt(
                 .into_iter()
                 .collect::<HashMap<(usize, usize, usize), f64>>();
 
-            // TODO: transhipment
             let action = optimal_actions
                 .get(&(t, state.0, state.1, state.2))
                 .unwrap_or(&(0, 0, 0, 0, 0));
@@ -302,6 +317,8 @@ fn optimal_policy_par(
         c_u_s,
         c_p,
         c_ts,
+        0, // Optinal doesn't need base-stock in the policy construcutor
+        0, // Optinal doesn't need base-stock in the policy construcutor
         p,
         sa_demand_param_two,
         sb_demand_param_two,
@@ -408,6 +425,8 @@ fn optimal_policy(
         c_u_s,
         c_p,
         c_ts,
+        0, // Optinal doesn't need base-stock in the policy construcutor
+        0, // Optinal doesn't need base-stock in the policy construcutor
         p,
         sa_demand_param_two,
         sb_demand_param_two,
