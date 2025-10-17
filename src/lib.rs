@@ -74,7 +74,7 @@ fn policy_evaluation_par_bs(
     let one_step_ahead_expectations = if transhipment_policy == 'E' {
             policy_constructor.all_one_step_ahead_out()
         } else {
-            HashMap::new() // Create empty hashmap if not needed
+            (HashMap::new(),HashMap::new()) // Create empty hashmap if not needed
         };
 
     let store_a_expectation_mean = rust::distributions::generate_distributions::distribution_mean(
@@ -102,7 +102,7 @@ fn policy_evaluation_par_bs(
     // Iterate through periods
 
     for t in (1..periods).rev() {
-        //println!("Period: {:?}",t);
+        println!("Period: {:?}",t);
         // Save previous iteration (v_t+1)
         let v_plus_1 = v.clone();
         //v.clear(); // Reset V to repopulate
@@ -120,7 +120,7 @@ fn policy_evaluation_par_bs(
                 .into_iter()
                 .collect::<HashMap<(usize, usize, usize), f64>>();
             
-            
+        
             let transhipment_action: (usize, usize) = if transhipment_policy == 'N' {
                 (0 as usize, 0 as usize)
             } else if transhipment_policy == 'T' {
@@ -129,7 +129,7 @@ fn policy_evaluation_par_bs(
                 let final_period = t == periods-1;
                 rust::policies::esr::calculate_esr(&policy_constructor, &one_step_ahead_expectations, state.1, state.2, base_stock_policy.1, base_stock_policy.2, final_period)
             } else {
-                (0 as usize, 0 as usize) // Placeholder for now
+                panic!("Transhipment policy not recognised");
             };
             // println!("State: {:?}, Transhipment action: {:?}", state, transhipment_action);
             let ordering_action: (usize, usize, usize) =
@@ -140,8 +140,6 @@ fn policy_evaluation_par_bs(
                 );
             
 
-            
-            // TODO: transhipment (done TIE)
             let action = (
                 ordering_action.0,
                 ordering_action.1,

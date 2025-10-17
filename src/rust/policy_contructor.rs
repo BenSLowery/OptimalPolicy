@@ -216,28 +216,37 @@ impl OptimalPolicy {
 
     // Keeps track of all one step ahead expectations for all states and order-up-to levels
     // returns: ((state, store_1/store_2, order-up-to-level), expectation, first stage expectation)
-    pub fn all_one_step_ahead_out(&self) -> HashMap<(usize, usize, usize), (f64, f64)> {
+    pub fn all_one_step_ahead_out(&self) -> (HashMap<(usize, usize, usize), (f64, f64)>,HashMap<(usize, usize, usize), (f64, f64)>) {
         let mut one_step_ahead_state_space = HashMap::new();
+        let mut one_step_ahead_state_space_terminal = HashMap::new();
         // Store a
         for st_a in 0..self.max_sa {
-            let (exp, exp_first_stage) = self.one_step_ahead(
-                st_a,
-                1,
-                self.base_stock_a as f64,
-            );
+            let (exp, exp_first_stage) =
+                self.one_step_ahead(st_a, 1, self.base_stock_a as f64, false);
+
+            let (exp_terminal, exp_first_stage_terminal) =
+                self.one_step_ahead(st_a, 1, self.base_stock_a as f64, true);
             one_step_ahead_state_space.insert((st_a, 1, self.base_stock_a), (exp, exp_first_stage));
+            one_step_ahead_state_space_terminal.insert(
+                (st_a, 1, self.base_stock_a),
+                (exp_terminal, exp_first_stage_terminal),
+            );
         }
         // Store b
         for st_b in 0..self.max_sb {
-            let (exp, exp_first_stage) = self.one_step_ahead(
-                st_b,
-                2,
-                self.base_stock_b as f64,
-            );
+            let (exp, exp_first_stage) =
+                self.one_step_ahead(st_b, 2, self.base_stock_b as f64, false);
+
+            let (exp_terminal, exp_first_stage_terminal) =
+                self.one_step_ahead(st_b, 2, self.base_stock_b as f64, true);
             one_step_ahead_state_space.insert((st_b, 2, self.base_stock_b), (exp, exp_first_stage));
+            one_step_ahead_state_space_terminal.insert(
+                (st_b, 2, self.base_stock_b),
+                (exp_terminal, exp_first_stage_terminal),
+            );
         }
 
-        one_step_ahead_state_space
+        (one_step_ahead_state_space, one_step_ahead_state_space_terminal)
     }
 
     pub fn expectation_store(&self, state: (usize, usize, usize)) -> PyResult<f64> {
@@ -314,28 +323,26 @@ impl OptimalPolicy {
 
     // For ESR policy
     // Assumes stationary distribution
-    pub fn one_step_ahead(&self,
+    pub fn one_step_ahead(
+        &self,
         x: usize,
         store: usize,
-        st_out: f64
+        st_out: f64,
+        terminal_period: bool,
     ) -> (f64, f64) {
-
         // Calculate the order quantity
         let q: f64 = f64::max(st_out - x as f64, 0.0);
 
         // Calculate the expectation
         let mut exp: f64 = 0.0;
         let mut exp_first_stage: f64 = 0.0;
-        
-        // get which stores pmf to use
-        let d_pmf = 
-            if store == 1 {
-                &self.da_pmf
-            } else {
-                &self.db_pmf
-            };
-        
 
+        // get which stores pmf to use
+        let d_pmf = if store == 1 {
+            &self.da_pmf
+        } else {
+            &self.db_pmf
+        };
 
         for (d1_val, d1_pmf_i) in d_pmf.iter().enumerate() {
             // First stage shortage
@@ -347,9 +354,16 @@ impl OptimalPolicy {
                 exp_first_stage += fs;
                 exp += fs;
             }
+            
 
-            // Second stage shortage
-            for (d2_val, d2_pmf_i) in d_pmf.iter().enumerate() {
+            // if terminal we have probabiliy of 0 demand as 1.
+            let d2_iter_terminal = &[1.0; 1];
+
+            for (d2_val, d2_pmf_i) in if !terminal_period {
+                d_pmf.iter().enumerate()
+            } else {
+                d2_iter_terminal.iter().enumerate()
+            } {
                 let shortage_p2: usize = max(
                     d2_val as isize - max(x as isize - d1_val as isize, 0) - q as isize,
                     0,
