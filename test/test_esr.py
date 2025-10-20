@@ -30,6 +30,6 @@ for wh in [i for i in range(7,12)]:
             max_wh=18,
             max_sa=5+sa*2,
             max_sb=5+sb*2,
-            transhipment_policy='L',
+            transhipment_policy='E',
             gamma=0.999
         )

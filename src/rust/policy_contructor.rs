@@ -1,5 +1,6 @@
 //////////////////
 //   Contains initialisation for an inventory policy
+//   As well as the preprocessing steps required for the heuristics transhipment methods
 //   Used a as a basis for calculating an optimal policy or evaluating a policy
 //////////////////
 
@@ -214,9 +215,77 @@ impl OptimalPolicy {
         state_space
     }
 
+    // Keeps track of all one step ahead expectations for all states when using the lookahead policy
+    pub fn all_one_step_ahead_la(
+        &self,
+        store_a_mean: f64,
+        store_b_mean: f64,
+    ) -> (
+        // Arguments are warehouse level, store state, store number
+        HashMap<(usize, usize, usize), (f64, f64, f64)>,
+        HashMap<(usize, usize, usize), (f64, f64, f64)>,
+    ) {
+        let mut one_step_lookahead_state_space = HashMap::new();
+        let mut one_step_lookahead_state_space_terminal = HashMap::new();
+
+        // Warehouse levels
+        for wh in 1..self.max_wh {
+            // calculate store a max q
+            let max_q_a = (store_a_mean / store_b_mean + store_b_mean) * (wh as f64);
+            let max_q_b = (store_b_mean / (store_a_mean + store_b_mean)) * (wh as f64);
+            // calculate store b max q
+
+            // Store a
+            for st_a in 0..self.max_sa {
+                let (exp, exp_first_stage, q) =
+                    self.one_step_ahead_lookahead(st_a, 1, max_q_a, false);
+
+                let (exp_terminal, exp_first_stage_terminal, q_terminal) =
+                    self.one_step_ahead_lookahead(st_a, 1, max_q_a, false);
+                
+                one_step_lookahead_state_space.insert(
+                    (wh, st_a, 1), 
+                    (exp, exp_first_stage, q)
+                );
+
+                one_step_lookahead_state_space_terminal.insert(
+                    (wh, st_a, 1),
+                    (exp_terminal, exp_first_stage_terminal, q_terminal),
+                );
+            }
+            // Store b
+            for st_b in 0..self.max_sb {
+                                let (exp, exp_first_stage, q) =
+                    self.one_step_ahead_lookahead(st_b, 2, max_q_b, false);
+
+                let (exp_terminal, exp_first_stage_terminal, q_terminal) =
+                    self.one_step_ahead_lookahead(st_b, 2, max_q_b, false);
+                
+                one_step_lookahead_state_space.insert(
+                    (wh, st_b, 2), 
+                    (exp, exp_first_stage, q)
+                );
+                
+                one_step_lookahead_state_space_terminal.insert(
+                    (wh, st_b, 2),
+                    (exp_terminal, exp_first_stage_terminal, q_terminal),
+                );
+            }
+        }
+        (
+            one_step_lookahead_state_space,
+            one_step_lookahead_state_space_terminal,
+        )
+    }
+
     // Keeps track of all one step ahead expectations for all states and order-up-to levels
     // returns: ((state, store_1/store_2, order-up-to-level), expectation, first stage expectation)
-    pub fn all_one_step_ahead_out(&self) -> (HashMap<(usize, usize, usize), (f64, f64)>,HashMap<(usize, usize, usize), (f64, f64)>) {
+    pub fn all_one_step_ahead_out(
+        &self,
+    ) -> (
+        HashMap<(usize, usize, usize), (f64, f64)>,
+        HashMap<(usize, usize, usize), (f64, f64)>,
+    ) {
         let mut one_step_ahead_state_space = HashMap::new();
         let mut one_step_ahead_state_space_terminal = HashMap::new();
         // Store a
@@ -246,7 +315,10 @@ impl OptimalPolicy {
             );
         }
 
-        (one_step_ahead_state_space, one_step_ahead_state_space_terminal)
+        (
+            one_step_ahead_state_space,
+            one_step_ahead_state_space_terminal,
+        )
     }
 
     pub fn expectation_store(&self, state: (usize, usize, usize)) -> PyResult<f64> {
@@ -354,7 +426,6 @@ impl OptimalPolicy {
                 exp_first_stage += fs;
                 exp += fs;
             }
-            
 
             // if terminal we have probabiliy of 0 demand as 1.
             let d2_iter_terminal = &[1.0; 1];
@@ -380,5 +451,130 @@ impl OptimalPolicy {
             }
         }
         (exp, exp_first_stage)
+    }
+
+    // For lookahead policy
+    // Includes a pre-computed ordering decision
+    pub fn one_step_ahead_lookahead(
+        &self,
+        x: usize,
+        store: usize,
+        max_q: f64,
+        terminal_period: bool,
+    ) -> (f64, f64, f64) {
+        // Calculate the expectation
+        let mut exp: f64 = 0.0;
+        let mut exp_first_stage: f64 = 0.0;
+
+        // get which stores pmf to use
+        let d_pmf = if store == 1 {
+            &self.da_pmf
+        } else {
+            &self.db_pmf
+        };
+
+        // Find the optimal q (if terminal we make no order as no demand is observed in next period)
+        let q: f64 = if terminal_period {0.0} else {self.minimise_q_search(max_q, x, d_pmf)};
+
+        // First stage shortage
+        for (d1_val, d1_pmf_i) in d_pmf.iter().enumerate() {
+            // First stage shortage
+            let shortage_p1: usize = max(d1_val as isize - x as isize, 0) as usize;
+            for j in 0..shortage_p1 + 1 {
+                let fs = d1_pmf_i
+                    * self.binom_pmf[shortage_p1][j]
+                    * (f64::max(d1_val as f64 - x as f64, 0.0) - j as f64);
+                exp_first_stage += fs;
+                exp += fs;
+            }
+            
+            // if terminal we have probabiliy of 0 demand as 1.
+            let d2_iter_terminal = &[1.0; 1];
+
+            // Second stage shortage
+            for (d2_val, d2_pmf_i) in if !terminal_period {
+                d_pmf.iter().enumerate()
+            } else {
+                d2_iter_terminal.iter().enumerate()
+            } {
+                let shortage_p2: usize = max(
+                    d2_val as isize - max(x as isize - d1_val as isize, 0) - q as isize,
+                    0,
+                ) as usize;
+                for j in 0..shortage_p2 + 1 {
+                    exp += d1_pmf_i
+                        * d2_pmf_i
+                        * self.binom_pmf[shortage_p2][j]
+                        * (f64::max(
+                            d2_val as f64 - f64::max(x as f64 - d1_val as f64, 0.0) - q,
+                            0.0,
+                        ) - j as f64);
+                }
+            }
+        }
+
+        (exp_first_stage, exp, q)
+    }
+
+    pub fn minimise_q_search(&self, max_q: f64, x: usize, d_pmf: &[f64]) -> f64 {
+        // Pick mid-point
+        let mut q_mid = f64::floor(max_q / 2.0);
+
+        if q_mid == 0.0 {
+            return 0.0;
+        }
+
+        let q_mid_res = self.lookahead_q_expectation(x, q_mid, d_pmf);
+        let q_plus_1 = self.lookahead_q_expectation(x, q_mid + 1.0, d_pmf);
+        let q_minus_1 = self.lookahead_q_expectation(x, q_mid - 1.0, d_pmf);
+
+        let best = f64::min(q_mid_res, f64::min(q_plus_1, q_minus_1));
+        if best == q_mid_res {
+            return q_mid;
+        }
+
+        // Get direction to move in
+        let dir: f64 = (if best == q_plus_1 { 1.0 } else { -1.0 } as f64);
+
+        loop {
+            let q_mid_res = self.lookahead_q_expectation(x, q_mid, d_pmf);
+            q_mid += dir;
+
+            let q_mid_res_change = self.lookahead_q_expectation(x, q_mid, d_pmf);
+            if q_mid_res_change > q_mid_res {
+                return q_mid - dir;
+            }
+
+            if q_mid == 0.0 || q_mid == max_q {
+                if f64::min(q_mid_res, q_mid_res_change) == q_mid_res {
+                    return q_mid - dir;
+                } else {
+                    return q_mid;
+                }
+            }
+        }
+    }
+
+    fn lookahead_q_expectation(&self, x: usize, q: f64, d_pmf: &[f64]) -> f64 {
+        // Calculate second stage expectation balancing shortage and holding costs
+        let mut exp: f64 = 0.0;
+        for (d1_val, d1_pmf_i) in d_pmf.iter().enumerate() {
+            // Second stage expectation
+
+            // On hand moving into the second stage
+            let x_2 = f64::max(x as f64 - d1_val as f64, 0.0) + q as f64;
+
+            for (d2_val, d2_pmf_i) in d_pmf.iter().enumerate() {
+                let shortage_p2: usize = std::cmp::max(d2_val as isize - x_2 as isize, 0) as usize;
+                for j in 0..shortage_p2 + 1 {
+                    exp += d1_pmf_i
+                        * d2_pmf_i
+                        * self.binom_pmf[shortage_p2][j]
+                        * (self.c_p * j as f64 + self.c_u_s * (shortage_p2 - j) as f64);
+                }
+                exp += d1_pmf_i * d2_pmf_i * self.h_s * f64::max(x_2 - d2_val as f64, 0.0);
+            }
+        }
+        return exp;
     }
 }

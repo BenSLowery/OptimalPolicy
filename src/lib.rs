@@ -12,7 +12,6 @@ mod rust;
 pub const D_MAX: usize = 25;
 
 // Policy evaluation given a regular base-stock policy for the action.
-// TODO: add in transhipment base-stock policies.
 // Need to include a variety of different policies.
 // Once this is done you just need to call rust::value_function::value_function_pol_eval and pass the normal constructors + action
 #[pyfunction]
@@ -60,22 +59,14 @@ fn policy_evaluation_par_bs(
         max_wh,
         max_sa,
         max_sb,
-        gamma
+        gamma,
     );
     let store_expectation = policy_constructor.expectation_all_stores();
     let warehouse_expectation = policy_constructor.expectation_all_warehouse();
-    
+
     // Implement transhipment policy
     // Can be 'N' - No transhipment, 'T' - TIE, 'E' - ESR or 'L' - Lookahead Policy
     let transhipment_policy = transhipment_policy.unwrap_or('N');
-
-
-    // generate the one step ahead expectations to use later (pregenerated hashmap for easier reading)
-    let one_step_ahead_expectations = if transhipment_policy == 'E' {
-            policy_constructor.all_one_step_ahead_out()
-        } else {
-            (HashMap::new(),HashMap::new()) // Create empty hashmap if not needed
-        };
 
     let store_a_expectation_mean = rust::distributions::generate_distributions::distribution_mean(
         distribution.unwrap_or('P'),
@@ -87,6 +78,20 @@ fn policy_evaluation_par_bs(
         sb_demand_param_one,
         sb_demand_param_two,
     );
+
+    // generate the one step ahead expectations to use later (pregenerated hashmap for easier reading)
+    let one_step_ahead_expectations = if transhipment_policy == 'E' {
+        policy_constructor.all_one_step_ahead_out()
+    } else {
+        (HashMap::new(), HashMap::new()) // Create empty hashmap if not needed
+    };
+
+    // generate one step lookahead expectations for the lookahead if needed
+    let one_step_lookahead_expectations = if transhipment_policy == 'L' {
+        policy_constructor.all_one_step_ahead_la(store_a_expectation_mean, store_b_expectation_mean)
+    } else {
+        (HashMap::new(), HashMap::new()) // Create empty hashmap if not needed
+    };
 
     // Create the thread pool
     rayon::ThreadPoolBuilder::new()
@@ -102,7 +107,7 @@ fn policy_evaluation_par_bs(
     // Iterate through periods
 
     for t in (1..periods).rev() {
-        println!("Period: {:?}",t);
+        println!("Period: {:?}", t);
         // Save previous iteration (v_t+1)
         let v_plus_1 = v.clone();
         //v.clear(); // Reset V to repopulate
@@ -119,25 +124,58 @@ fn policy_evaluation_par_bs(
                 .clone()
                 .into_iter()
                 .collect::<HashMap<(usize, usize, usize), f64>>();
-            
-        
-            let transhipment_action: (usize, usize) = if transhipment_policy == 'N' {
-                (0 as usize, 0 as usize)
-            } else if transhipment_policy == 'T' {
-                rust::policies::tie::calculate_tie(state.1, state.2, store_a_expectation_mean, store_b_expectation_mean, max_sa.unwrap_or(10), max_sb.unwrap_or(10))
-            } else if transhipment_policy == 'E' {
-                let final_period = t == periods-1;
-                rust::policies::esr::calculate_esr(&policy_constructor, &one_step_ahead_expectations, state.1, state.2, base_stock_policy.1, base_stock_policy.2, final_period)
+
+            let ordering_action: (usize, usize, usize);
+            let transhipment_action: (usize, usize);
+
+            if transhipment_policy == 'L' {
+                let lookahead_action = 
+                    rust::policies::lookahead::calculate_lookahead(
+                        &policy_constructor,
+                        &one_step_lookahead_expectations,
+                        state,
+                        base_stock_policy.0,
+                        t == periods - 1,
+                    );
+                ordering_action = (lookahead_action.0,lookahead_action.1,lookahead_action.2);
+                transhipment_action = (lookahead_action.3,lookahead_action.4);
             } else {
-                panic!("Transhipment policy not recognised");
-            };
-            // println!("State: {:?}, Transhipment action: {:?}", state, transhipment_action);
-            let ordering_action: (usize, usize, usize) =
-                rust::policies::base_stock::regular_base_stock(
-                    (state.0, state.1-transhipment_action.0+transhipment_action.1, state.2-transhipment_action.1+transhipment_action.0),
+                transhipment_action = if transhipment_policy == 'N' {
+                    (0 as usize, 0 as usize)
+                } else if transhipment_policy == 'T' {
+                    rust::policies::tie::calculate_tie(
+                        state.1,
+                        state.2,
+                        store_a_expectation_mean,
+                        store_b_expectation_mean,
+                        max_sa.unwrap_or(10),
+                        max_sb.unwrap_or(10),
+                    )
+                } else if transhipment_policy == 'E' {
+                    let final_period = t == periods - 1;
+                    rust::policies::esr::calculate_esr(
+                        &policy_constructor,
+                        &one_step_ahead_expectations,
+                        state.1,
+                        state.2,
+                        base_stock_policy.1,
+                        base_stock_policy.2,
+                        final_period,
+                    )
+                } else {
+                    panic!("Transhipment policy not recognised");
+                };
+                // println!("State: {:?}, Transhipment action: {:?}", state, transhipment_action);
+                ordering_action = rust::policies::base_stock::regular_base_stock(
+                    (
+                        state.0,
+                        state.1 - transhipment_action.0 + transhipment_action.1,
+                        state.2 - transhipment_action.1 + transhipment_action.0,
+                    ),
                     base_stock_policy.0,
                     (base_stock_policy.1, base_stock_policy.2),
                 );
+            }
             
 
             let action = (
@@ -147,7 +185,7 @@ fn policy_evaluation_par_bs(
                 transhipment_action.0,
                 transhipment_action.1,
             );
-
+            println!("{:?}, {:?}", state,action);
 
             // Calculate the value function
             let v_t_x = rust::value_function::value_function_pol_eval(
@@ -176,8 +214,6 @@ fn policy_evaluation_par_bs(
         .collect::<HashMap<(usize, usize, usize), f64>>();
     Ok((optimal_pol_hm, v_hm))
 }
-
-
 
 // Policy evaluation of the optimal action
 #[pyfunction]
