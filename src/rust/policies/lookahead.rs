@@ -1,24 +1,24 @@
 use crate::rust;
-use std::collections::HashMap;
 use std::cmp::max;
+use std::collections::HashMap;
 use std::usize;
 
-pub fn calculate_lookahead (
+pub fn calculate_lookahead(
     policy_constructor: &rust::policy_contructor::OptimalPolicy,
     expectation_all_one_step_lookahead_and_terminal: &(
         HashMap<(usize, usize, usize), (f64, f64, f64)>,
         HashMap<(usize, usize, usize), (f64, f64, f64)>,
     ),
-    state: (usize, usize,usize),
+    state: (usize, usize, usize),
     warehouse_order: usize,
     terminal_period: bool,
 ) -> (usize, usize, usize, usize, usize) {
     let state_a = state.1;
     let state_b = state.2;
     let wh = state.0;
-    
+
     // Save action to return
-    let mut action: (usize, usize, usize, usize,usize) = (0,0,0,0,0);
+    let mut action: (usize, usize, usize, usize, usize) = (0, 0, 0, 0, 0);
 
     // remember warehouse calculation
     let expecation_all_one_step_lookahead = if terminal_period {
@@ -66,16 +66,11 @@ pub fn calculate_lookahead (
         };
         let destination = if source == 1 { 2 } else { 1 };
 
-        let mut source_info = (
-            wh,
-            if source == 1 { state_a } else { state_b },
-            source,
-        );
+        let mut source_info = (wh, if source == 1 { state_a } else { state_b }, source);
         let mut desintation_info = (
             wh,
             if destination == 1 { state_a } else { state_b },
             destination,
-
         );
 
         let mut transhipments_still_occur = true;
@@ -84,23 +79,26 @@ pub fn calculate_lookahead (
             // Check we are not at the state-space boundary
             if desintation_info.2 == 1 && desintation_info.1 == policy_constructor.max_sa - 1 {
                 transhipments_still_occur = false;
-            } else if desintation_info.2 == 2 && desintation_info.1 == policy_constructor.max_sb - 1 {
+            } else if desintation_info.2 == 2 && desintation_info.1 == policy_constructor.max_sb - 1
+            {
                 transhipments_still_occur = false;
             }
             // conversly if we are at the minimum state value we cannot transfer more
-            else if source_info.1 == 1 {
+            else if source_info.1 == 0 {
                 transhipments_still_occur = false;
             } else {
                 let alpha = expecation_all_one_step_lookahead
                     [&(source_info.0, source_info.1 - 1, source_info.2)]
                     .0
-                    - expecation_all_one_step_lookahead[&(source_info.0, source_info.1, source_info.2)].0;
+                    - expecation_all_one_step_lookahead
+                        [&(source_info.0, source_info.1, source_info.2)]
+                        .0;
                 let delta = expecation_all_one_step_lookahead
                     [&(desintation_info.0, desintation_info.1, desintation_info.2)]
                     .0
                     - expecation_all_one_step_lookahead[&(
                         desintation_info.0,
-                        desintation_info.1-1,
+                        desintation_info.1 + 1,
                         desintation_info.2,
                     )]
                         .0;
@@ -116,7 +114,7 @@ pub fn calculate_lookahead (
                         )]
                             .1)
                         >= (expecation_all_one_step_lookahead
-                            [&(source_info.0, source_info.1 -1 , source_info.2)]
+                            [&(source_info.0, source_info.1 - 1, source_info.2)]
                             .1
                             - expecation_all_one_step_lookahead
                                 [&(source_info.0, source_info.1, source_info.2)]
@@ -137,16 +135,31 @@ pub fn calculate_lookahead (
             }
         }
         // Get ordering quantity based on the this state
-        let q_source = expecation_all_one_step_lookahead[&(source_info.0, source_info.1, source_info.2)].2;
-        let q_destination = expecation_all_one_step_lookahead[&(desintation_info.0, desintation_info.1, desintation_info.2)].2;
-        if source_info.1 == 1 {
-
-            (q_source as usize, q_destination as usize, state_a - source_info.1, 0)
+        let q_source =
+            expecation_all_one_step_lookahead[&(source_info.0, source_info.1, source_info.2)].2;
+        let q_destination = expecation_all_one_step_lookahead
+            [&(desintation_info.0, desintation_info.1, desintation_info.2)]
+            .2;
+        if source_info.2 == 1 {
+            (
+                q_source as usize,
+                q_destination as usize,
+                state_a - source_info.1,
+                0,
+            )
         } else {
-            (q_destination as usize, q_source as usize, 0, state_b - source_info.1)
+            (
+                q_destination as usize,
+                q_source as usize,
+                0,
+                state_b - source_info.1,
+            )
         }
     };
     // Calculate warehouse order (uses regular base-stock policy)
-    action.0 = max(warehouse_order as usize - max(wh - (action.1 + action.2),0),0);
+    action.0 = max(
+        warehouse_order as isize - max(wh as isize - (action.1 + action.2) as isize, 0) as isize,
+        0,
+    ) as usize;
     action
 }

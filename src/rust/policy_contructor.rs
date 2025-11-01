@@ -229,24 +229,28 @@ impl OptimalPolicy {
         let mut one_step_lookahead_state_space_terminal = HashMap::new();
 
         // Warehouse levels
-        for wh in 1..self.max_wh {
+        for wh in 0..self.max_wh {
             // calculate store a max q
-            let max_q_a = (store_a_mean / store_b_mean + store_b_mean) * (wh as f64);
-            let max_q_b = (store_b_mean / (store_a_mean + store_b_mean)) * (wh as f64);
-            // calculate store b max q
-
+            let mut max_q_a =
+                ((store_a_mean / (store_a_mean + store_b_mean)) * (wh as f64)).floor() as f64;
+            let mut max_q_b =
+                ((store_b_mean / (store_a_mean + store_b_mean)) * (wh as f64)).floor() as f64;
+            if max_q_a + max_q_b != wh as f64 {
+                if store_a_mean >= store_b_mean {
+                    max_q_a += 1.0;
+                } else {
+                    max_q_b += 1.0;
+                }
+            }
             // Store a
             for st_a in 0..self.max_sa {
                 let (exp, exp_first_stage, q) =
                     self.one_step_ahead_lookahead(st_a, 1, max_q_a, false);
 
                 let (exp_terminal, exp_first_stage_terminal, q_terminal) =
-                    self.one_step_ahead_lookahead(st_a, 1, max_q_a, false);
-                
-                one_step_lookahead_state_space.insert(
-                    (wh, st_a, 1), 
-                    (exp, exp_first_stage, q)
-                );
+                    self.one_step_ahead_lookahead(st_a, 1, max_q_a, true);
+
+                one_step_lookahead_state_space.insert((wh, st_a, 1), (exp, exp_first_stage, q));
 
                 one_step_lookahead_state_space_terminal.insert(
                     (wh, st_a, 1),
@@ -255,17 +259,14 @@ impl OptimalPolicy {
             }
             // Store b
             for st_b in 0..self.max_sb {
-                                let (exp, exp_first_stage, q) =
+                let (exp, exp_first_stage, q) =
                     self.one_step_ahead_lookahead(st_b, 2, max_q_b, false);
 
                 let (exp_terminal, exp_first_stage_terminal, q_terminal) =
-                    self.one_step_ahead_lookahead(st_b, 2, max_q_b, false);
-                
-                one_step_lookahead_state_space.insert(
-                    (wh, st_b, 2), 
-                    (exp, exp_first_stage, q)
-                );
-                
+                    self.one_step_ahead_lookahead(st_b, 2, max_q_b, true);
+
+                one_step_lookahead_state_space.insert((wh, st_b, 2), (exp, exp_first_stage, q));
+
                 one_step_lookahead_state_space_terminal.insert(
                     (wh, st_b, 2),
                     (exp_terminal, exp_first_stage_terminal, q_terminal),
@@ -474,7 +475,7 @@ impl OptimalPolicy {
         };
 
         // Find the optimal q (if terminal we make no order as no demand is observed in next period)
-        let q: f64 = if terminal_period {0.0} else {self.minimise_q_search(max_q, x, d_pmf)};
+        let q: f64 = self.minimise_q_search(max_q, x, d_pmf, terminal_period);
 
         // First stage shortage
         for (d1_val, d1_pmf_i) in d_pmf.iter().enumerate() {
@@ -487,7 +488,7 @@ impl OptimalPolicy {
                 exp_first_stage += fs;
                 exp += fs;
             }
-            
+
             // if terminal we have probabiliy of 0 demand as 1.
             let d2_iter_terminal = &[1.0; 1];
 
@@ -516,7 +517,7 @@ impl OptimalPolicy {
         (exp_first_stage, exp, q)
     }
 
-    pub fn minimise_q_search(&self, max_q: f64, x: usize, d_pmf: &[f64]) -> f64 {
+    pub fn minimise_q_search(&self, max_q: f64, x: usize, d_pmf: &[f64], terminal: bool) -> f64 {
         // Pick mid-point
         let mut q_mid = f64::floor(max_q / 2.0);
 
@@ -524,9 +525,9 @@ impl OptimalPolicy {
             return 0.0;
         }
 
-        let q_mid_res = self.lookahead_q_expectation(x, q_mid, d_pmf);
-        let q_plus_1 = self.lookahead_q_expectation(x, q_mid + 1.0, d_pmf);
-        let q_minus_1 = self.lookahead_q_expectation(x, q_mid - 1.0, d_pmf);
+        let q_mid_res = self.lookahead_q_expectation(x, q_mid, d_pmf, terminal);
+        let q_plus_1 = self.lookahead_q_expectation(x, q_mid + 1.0, d_pmf,terminal);
+        let q_minus_1 = self.lookahead_q_expectation(x, q_mid - 1.0, d_pmf,terminal);
 
         let best = f64::min(q_mid_res, f64::min(q_plus_1, q_minus_1));
         if best == q_mid_res {
@@ -537,10 +538,10 @@ impl OptimalPolicy {
         let dir: f64 = (if best == q_plus_1 { 1.0 } else { -1.0 } as f64);
 
         loop {
-            let q_mid_res = self.lookahead_q_expectation(x, q_mid, d_pmf);
+            let q_mid_res = self.lookahead_q_expectation(x, q_mid, d_pmf,terminal);
             q_mid += dir;
 
-            let q_mid_res_change = self.lookahead_q_expectation(x, q_mid, d_pmf);
+            let q_mid_res_change = self.lookahead_q_expectation(x, q_mid, d_pmf, terminal);
             if q_mid_res_change > q_mid_res {
                 return q_mid - dir;
             }
@@ -555,7 +556,7 @@ impl OptimalPolicy {
         }
     }
 
-    fn lookahead_q_expectation(&self, x: usize, q: f64, d_pmf: &[f64]) -> f64 {
+    fn lookahead_q_expectation(&self, x: usize, q: f64, d_pmf: &[f64],terminal: bool) -> f64 {
         // Calculate second stage expectation balancing shortage and holding costs
         let mut exp: f64 = 0.0;
         for (d1_val, d1_pmf_i) in d_pmf.iter().enumerate() {
@@ -563,8 +564,16 @@ impl OptimalPolicy {
 
             // On hand moving into the second stage
             let x_2 = f64::max(x as f64 - d1_val as f64, 0.0) + q as f64;
+            
+            // if terminal we have probabiliy of 0 demand as 1.
+            let d2_iter_terminal = &[1.0; 1];
 
-            for (d2_val, d2_pmf_i) in d_pmf.iter().enumerate() {
+
+            for (d2_val, d2_pmf_i) in if !terminal {
+                d_pmf.iter().enumerate()
+            } else {
+                d2_iter_terminal.iter().enumerate()
+            } {
                 let shortage_p2: usize = std::cmp::max(d2_val as isize - x_2 as isize, 0) as usize;
                 for j in 0..shortage_p2 + 1 {
                     exp += d1_pmf_i

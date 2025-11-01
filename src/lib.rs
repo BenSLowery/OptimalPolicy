@@ -2,7 +2,6 @@
 use dashmap::DashMap;
 use pyo3::prelude::*;
 use rayon::prelude::*;
-
 use std::collections::HashMap;
 use std::usize;
 
@@ -129,16 +128,16 @@ fn policy_evaluation_par_bs(
             let transhipment_action: (usize, usize);
 
             if transhipment_policy == 'L' {
-                let lookahead_action = 
-                    rust::policies::lookahead::calculate_lookahead(
-                        &policy_constructor,
-                        &one_step_lookahead_expectations,
-                        state,
-                        base_stock_policy.0,
-                        t == periods - 1,
-                    );
-                ordering_action = (lookahead_action.0,lookahead_action.1,lookahead_action.2);
-                transhipment_action = (lookahead_action.3,lookahead_action.4);
+                let final_period = t == periods - 1;
+                let lookahead_action = rust::policies::lookahead::calculate_lookahead(
+                    &policy_constructor,
+                    &one_step_lookahead_expectations,
+                    state,
+                    base_stock_policy.0,
+                    final_period,
+                );
+                ordering_action = (lookahead_action.0, lookahead_action.1, lookahead_action.2);
+                transhipment_action = (lookahead_action.3, lookahead_action.4);
             } else {
                 transhipment_action = if transhipment_policy == 'N' {
                     (0 as usize, 0 as usize)
@@ -176,7 +175,6 @@ fn policy_evaluation_par_bs(
                     (base_stock_policy.1, base_stock_policy.2),
                 );
             }
-            
 
             let action = (
                 ordering_action.0,
@@ -185,7 +183,6 @@ fn policy_evaluation_par_bs(
                 transhipment_action.0,
                 transhipment_action.1,
             );
-            println!("{:?}, {:?}", state,action);
 
             // Calculate the value function
             let v_t_x = rust::value_function::value_function_pol_eval(
