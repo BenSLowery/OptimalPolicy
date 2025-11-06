@@ -381,6 +381,7 @@ impl OptimalPolicy {
                                 let unfulfilled = excess - k as isize;
                                 exp += da_pmf_i
                                     * db_pmf_i
+                                    * self.binom_pmf[max_beta_sa][j]
                                     * self.binom_pmf[max_beta_sb][k]
                                     * (self.c_p * k as f64 + unfulfilled as f64 * self.c_u_s)
                                         as f64;

@@ -1,6 +1,6 @@
 [project]
 name = "optimalpolicy"
-version = "0.2.0"
+version = "0.2.1"
 description = "Add your description here"
 readme = "README.md"
 authors = [
@@ -10,6 +10,9 @@ classifiers = ["Private :: Do Not Upload"]
 requires-python = ">=3.11"
 dependencies = [
     "scipy>=1.15.2",
+    "pandas>=2.2.0",
+    "inventorygyms",
+    "wrapper-alternative",
 ]
 
 [project.scripts]
@@ -24,8 +27,17 @@ python-source = "src"
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+]
+
 [tool.uv]
 # Rebuild package when any rust files change
 cache-keys = [{file = "pyproject.toml"}, {file = "rust/Cargo.toml"}, {file = "**/*.rs"}]
 # Uncomment to build rust code in development mode
 config-settings = { build-args = '--profile=dev' }
+
+[tool.uv.sources]
+wrapper-alternative = { path = "../../artefacts/wrapper_alternative-0.1.2-cp311-cp311-manylinux_2_34_x86_64.whl" }
+inventorygyms = { path = "../../InventoryGyms/dist/inventorygyms-0.2.0-py3-none-any.whl" }

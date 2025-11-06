@@ -518,6 +518,50 @@ fn optimal_policy(
     Ok((optimal_pol, v))
 }
 
+#[pyfunction]
+#[pyo3(signature = (sa_demand_param_one, sb_demand_param_one, h_s,h_w, c_u_s, c_p, c_ts, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10, gamma=0.99))]
+fn warehouse_store_expectations_py(
+    sa_demand_param_one: f64,
+    sb_demand_param_one: f64,
+    h_s: f64,
+    h_w: f64,
+    c_u_s: f64,
+    c_p: f64,
+    c_ts: f64,
+    p: Option<f64>,
+    sa_demand_param_two: Option<f64>,
+    sb_demand_param_two: Option<f64>,
+    distribution: Option<char>,
+    max_wh: Option<usize>,
+    max_sa: Option<usize>,
+    max_sb: Option<usize>,
+    gamma: Option<f64>,
+) -> PyResult<(HashMap<(usize, usize, usize), f64>,HashMap<(usize, usize, usize), f64>)> {
+     // Stores all the infrastructure for the parameters in the optimal policy
+     let policy_constructor = rust::policy_contructor::OptimalPolicy::new(
+        sa_demand_param_one,
+        sb_demand_param_one,
+        h_s,
+        h_w,
+        c_u_s,
+        c_p,
+        c_ts,
+        0, // Optinal doesn't need base-stock in the policy construcutor
+        0, // Optinal doesn't need base-stock in the policy construcutor
+        p,
+        sa_demand_param_two,
+        sb_demand_param_two,
+        distribution,
+        max_wh,
+        max_sa,
+        max_sb,
+        gamma,
+    );
+    let store_expectation = policy_constructor.expectation_all_stores();
+    let warehouse_expectation = policy_constructor.expectation_all_warehouse();
+    Ok((store_expectation, warehouse_expectation))
+}
+
 /// A Python module implemented in Rust. The name of this function must match
 /// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
 /// import the module.
@@ -527,6 +571,7 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(optimal_policy_par, m)?)?;
     m.add_function(wrap_pyfunction!(policy_evaluation_par_bs, m)?)?;
     m.add_function(wrap_pyfunction!(policy_evaluation_par_opt, m)?)?;
+    m.add_function(wrap_pyfunction!(warehouse_store_expectations_py, m)?)?;
     //m.add_function(wrap_pyfunction!(pre_calculate_store_costs, m)?)?;
     //m.add_function(wrap_pyfunction!(pre_calculate_warehouse_costs, m)?)?;
     //m.add_function(wrap_pyfunction!(expectation_warehouse, m)?)?;

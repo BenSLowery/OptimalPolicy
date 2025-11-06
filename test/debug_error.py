@@ -1,29 +1,29 @@
-import optimalpolicy._core as rust_helpers
+import optimalpolicy._core as rust_helper
 import pickle
-import sys
+import pandas as pd
+# Instance,T,Store A demand,Store B demand,distribution,holding store,holding warehouse,shortage,dfw cost,transhipment cost,dfw probability,max warehouse,transhipment policy,gamma
+def eval_opt_policy(policy):
 
 
-def test_optimal_pol():
-    # h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64,
-    pol, val = rust_helpers.optimal_policy_par(
-        periods=5,
-        sa_demand_param_one=5,
-        sb_demand_param_one=2,
-        h_s=1,
-        h_w=1,
-        c_u_s=9,
-        c_p=0,
-        c_ts=1,
-        p=0.8,
-        num_cores=3,
-        max_wh=18,
+    wh_exp, st_exp = rust_helper.warehouse_store_expectations_py(
+        policy['Store A demand'],
+        policy['Store B demand'],
+        policy['holding store'],
+        policy['holding warehouse'],
+        policy['shortage'],
+        policy['dfw cost'],
+        policy['transhipment cost'],
+        p=policy['dfw probability'],
+        max_wh=25,
         max_sa=15,
         max_sb=9,
         gamma=0.999,
     )
-    return val
+    return (wh_exp, st_exp)
 
-
-if __name__ == "__main__":
-    val = test_optimal_pol()
-    print(val[min(val, key=val.get)])
+if __name__ == '__main__':
+    sim_study = pd.read_csv('/home/loweryb/Project2/SimStudyPaper2/two_store_sim_study/sim_study_parameters.csv')
+    
+    wh_exp, st_exp = eval_opt_policy(sim_study[sim_study['Instance'] == 179].iloc[0])
+    print(wh_exp)
+    print(st_exp)
