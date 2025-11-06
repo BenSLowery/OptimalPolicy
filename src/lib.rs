@@ -270,7 +270,7 @@ fn policy_evaluation_par_opt(
     // Iterate through periods
 
     for t in (1..periods).rev() {
-        //println!("Period: {:?}",t);
+        println!("Period: {:?}",t);
         // Save previous iteration (v_t+1)
         let v_plus_1 = v.clone();
         //v.clear(); // Reset V to repopulate
@@ -291,7 +291,7 @@ fn policy_evaluation_par_opt(
             let action = optimal_actions
                 .get(&(t, state.0, state.1, state.2))
                 .unwrap_or(&(0, 0, 0, 0, 0));
-            //println!("{:?}, {:?}", state,action);
+
             // Calculate the value function
             let v_t_x = rust::value_function::value_function_pol_eval(
                 &policy_constructor,

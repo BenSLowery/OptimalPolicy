@@ -1,8 +1,10 @@
 import optimalpolicy._core as rust_helpers
 import pickle
 import sys
+
+
 def test_optimal_pol():
-    #h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64, 
+    # h_s: f64, h_w: f64, c_u_s: f64, c_p: f64, c_ts: f64,
     pol, val = rust_helpers.optimal_policy_par(
         periods=5,
         sa_demand_param_one=5,
@@ -16,12 +18,12 @@ def test_optimal_pol():
         num_cores=3,
         max_wh=18,
         max_sa=15,
-        max_sb=9, 
-        gamma=0.999
+        max_sb=9,
+        gamma=0.999,
     )
     return val
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     val = test_optimal_pol()
-    print(val[min(val,key=val.get)])
+    print(val[min(val, key=val.get)])
