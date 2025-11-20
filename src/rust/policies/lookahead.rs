@@ -163,3 +163,38 @@ pub fn calculate_lookahead(
     ) as usize;
     action
 }
+
+pub fn calculate_lookahead_no_transhipment(
+    expectation_all_one_step_lookahead_and_terminal: &(
+        HashMap<(usize, usize, usize), (f64, f64, f64)>,
+        HashMap<(usize, usize, usize), (f64, f64, f64)>,
+    ),
+    state: (usize, usize, usize),
+    warehouse_order: usize,
+    terminal_period: bool,
+) -> (usize, usize, usize) {
+    let state_a = state.1;
+    let state_b = state.2;
+    let wh = state.0;
+
+    // remember warehouse calculation
+    let expecation_all_one_step_lookahead = if terminal_period {
+        &expectation_all_one_step_lookahead_and_terminal.1
+    } else {
+        &expectation_all_one_step_lookahead_and_terminal.0
+    };
+
+        
+    // Save action to return
+
+    let q_a = expecation_all_one_step_lookahead[&(wh, state_a, 1)].2;
+    let q_b = expecation_all_one_step_lookahead[&(wh, state_b, 2)].2;
+
+    // Calculate warehouse order (uses regular base-stock policy)
+    let warehouse_q = max(
+        warehouse_order as isize - max(wh as isize - (q_a + q_b) as isize, 0) as isize,
+        0,
+    ) as usize;
+
+    (warehouse_q, q_a as usize,q_b as usize)
+}

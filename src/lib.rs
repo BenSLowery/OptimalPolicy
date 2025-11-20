@@ -14,7 +14,7 @@ pub const D_MAX: usize = 25;
 // Need to include a variety of different policies.
 // Once this is done you just need to call rust::value_function::value_function_pol_eval and pass the normal constructors + action
 #[pyfunction]
-#[pyo3(signature = (periods,sa_demand_param_one, sb_demand_param_one, h_s,h_w, c_u_s, c_p, c_ts, base_stock_vals=(14,7,7) ,transhipment_policy='N',num_cores=4, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10, gamma=0.99))]
+#[pyo3(signature = (periods,sa_demand_param_one, sb_demand_param_one, h_s,h_w, c_u_s, c_p, c_ts, base_stock_vals=(14,7,7) ,transhipment_policy='N',num_cores=4, p=None, sa_demand_param_two=None, sb_demand_param_two=None, distribution=None, max_wh=20, max_sa=10, max_sb=10, gamma=0.999, ordering_policy='R',order_cap=None))]
 fn policy_evaluation_par_bs(
     periods: usize,
     sa_demand_param_one: f64,
@@ -35,6 +35,8 @@ fn policy_evaluation_par_bs(
     max_sa: Option<usize>,
     max_sb: Option<usize>,
     gamma: Option<f64>,
+    ordering_policy: Option<char>,
+    order_cap: Option<(usize,usize)>,
 ) -> PyResult<(
     HashMap<(usize, usize, usize, usize), (usize, usize, usize, usize, usize)>,
     HashMap<(usize, usize, usize), f64>,
@@ -64,8 +66,11 @@ fn policy_evaluation_par_bs(
     let warehouse_expectation = policy_constructor.expectation_all_warehouse();
 
     // Implement transhipment policy
-    // Can be 'N' - No transhipment, 'T' - TIE, 'E' - ESR or 'L' - Lookahead Policy
+    // Can be 'N' - No transhipment, 'T' - TIE, 'E' - ESR or 'L' - Lookahead Policy, 'O' - one step ahead no transhipment
     let transhipment_policy = transhipment_policy.unwrap_or('N');
+    // Implement ordering policy, can be 'R' for regular base-stock, 'E' for echelon base-stock, 'C' for regular with order caps and 'S' for echelon with order caps
+    // Only R and C implemented right now
+    let ordering_policy: char=  ordering_policy.unwrap_or('R');
 
     let store_a_expectation_mean = rust::distributions::generate_distributions::distribution_mean(
         distribution.unwrap_or('P'),
@@ -85,8 +90,10 @@ fn policy_evaluation_par_bs(
         (HashMap::new(), HashMap::new()) // Create empty hashmap if not needed
     };
 
-    // generate one step lookahead expectations for the lookahead if needed
-    let one_step_lookahead_expectations = if transhipment_policy == 'L' {
+    // generate one step lookahead expectations for the lookahead if needed (and the one step no transhipment lookahead)
+    let one_step_lookahead_expectations = if (transhipment_policy == 'L')
+        | (transhipment_policy == 'O')
+    {
         policy_constructor.all_one_step_ahead_la(store_a_expectation_mean, store_b_expectation_mean)
     } else {
         (HashMap::new(), HashMap::new()) // Create empty hashmap if not needed
@@ -138,6 +145,17 @@ fn policy_evaluation_par_bs(
                 );
                 ordering_action = (lookahead_action.0, lookahead_action.1, lookahead_action.2);
                 transhipment_action = (lookahead_action.3, lookahead_action.4);
+            } else if transhipment_policy == 'O' {
+                let final_period = t == periods - 1;
+                let lookahead_no_transhipment_action =
+                    rust::policies::lookahead::calculate_lookahead_no_transhipment(
+                        &one_step_lookahead_expectations,
+                        state,
+                        base_stock_policy.0,
+                        final_period,
+                    );
+                ordering_action = lookahead_no_transhipment_action;
+                transhipment_action = (0,0);
             } else {
                 transhipment_action = if transhipment_policy == 'N' {
                     (0 as usize, 0 as usize)
@@ -165,15 +183,32 @@ fn policy_evaluation_par_bs(
                     panic!("Transhipment policy not recognised");
                 };
                 // println!("State: {:?}, Transhipment action: {:?}", state, transhipment_action);
-                ordering_action = rust::policies::base_stock::regular_base_stock(
-                    (
-                        state.0,
-                        state.1 - transhipment_action.0 + transhipment_action.1,
-                        state.2 - transhipment_action.1 + transhipment_action.0,
-                    ),
-                    base_stock_policy.0,
-                    (base_stock_policy.1, base_stock_policy.2),
-                );
+                if ordering_policy == 'R' {
+                    ordering_action = rust::policies::base_stock::regular_base_stock(
+                        (
+                            state.0,
+                            state.1 - transhipment_action.0 + transhipment_action.1,
+                            state.2 - transhipment_action.1 + transhipment_action.0,
+                        ),
+                        base_stock_policy.0,
+                        (base_stock_policy.1, base_stock_policy.2),
+                        None
+                    );
+                    
+                } else if ordering_policy == 'C' {
+                    ordering_action = rust::policies::base_stock::regular_base_stock(
+                        (
+                            state.0,
+                            state.1 - transhipment_action.0 + transhipment_action.1,
+                            state.2 - transhipment_action.1 + transhipment_action.0,
+                        ),
+                        base_stock_policy.0,
+                        (base_stock_policy.1, base_stock_policy.2),
+                        order_cap
+                    );
+                } else {
+                    panic!("Ordering policy not recognised");
+                }
             }
 
             let action = (
@@ -270,7 +305,7 @@ fn policy_evaluation_par_opt(
     // Iterate through periods
 
     for t in (1..periods).rev() {
-        println!("Period: {:?}",t);
+        println!("Period: {:?}", t);
         // Save previous iteration (v_t+1)
         let v_plus_1 = v.clone();
         //v.clear(); // Reset V to repopulate
@@ -536,9 +571,12 @@ fn warehouse_store_expectations_py(
     max_sa: Option<usize>,
     max_sb: Option<usize>,
     gamma: Option<f64>,
-) -> PyResult<(HashMap<(usize, usize, usize), f64>,HashMap<(usize, usize, usize), f64>)> {
-     // Stores all the infrastructure for the parameters in the optimal policy
-     let policy_constructor = rust::policy_contructor::OptimalPolicy::new(
+) -> PyResult<(
+    HashMap<(usize, usize, usize), f64>,
+    HashMap<(usize, usize, usize), f64>,
+)> {
+    // Stores all the infrastructure for the parameters in the optimal policy
+    let policy_constructor = rust::policy_contructor::OptimalPolicy::new(
         sa_demand_param_one,
         sb_demand_param_one,
         h_s,

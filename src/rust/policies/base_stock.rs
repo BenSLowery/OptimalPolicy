@@ -1,12 +1,17 @@
 use std::cmp::max;
+use std::cmp::min;
 
 // Implement a base-stock policy for rust
 // Note there is a lead-time of 1 for the store and warehouse.
-pub fn regular_base_stock(state: (usize, usize, usize), warehouse_bs: usize, store_bs: (usize, usize)) -> (usize, usize, usize) {
+pub fn regular_base_stock(state: (usize, usize, usize), warehouse_bs: usize, store_bs: (usize, usize), order_cap: Option<(usize,usize)>) -> (usize, usize, usize) {
+    let order_caps = order_cap.unwrap_or(store_bs);
     // Remember store_bs.0 is the first store and store_bs.1 is the second stores order up to
     let mut desired_sa = max(store_bs.0 as isize - state.1 as isize, 0) as usize;
     let mut desired_sb = max(store_bs.1 as isize - state.2 as isize, 0) as usize;
 
+    desired_sa = min(desired_sa, order_caps.0);
+    desired_sb = min(desired_sb, order_caps.1);
+     
     let wh_order: usize = max(warehouse_bs as isize - max(state.0 as isize - desired_sa as isize - desired_sb as isize,0) as isize, 0) as usize;
 
     // if the desired is more than the warehouse level then we need to allocate
