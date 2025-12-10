@@ -228,8 +228,6 @@ fn policy_evaluation_par_bs(
                 &store_expectation,
                 &warehouse_expectation,
             );
-            // Update the value function
-
             v.insert(state, v_t_x);
             // Store the optimal policy
             optimal_pol.insert((t, state.0, state.1, state.2), action);
@@ -305,7 +303,6 @@ fn policy_evaluation_par_opt(
     // Iterate through periods
 
     for t in (1..periods).rev() {
-        //println!("Period: {:?}", t);
         // Save previous iteration (v_t+1)
         let v_plus_1 = v.clone();
         //v.clear(); // Reset V to repopulate
@@ -325,7 +322,7 @@ fn policy_evaluation_par_opt(
 
             let action = optimal_actions
                 .get(&(t, state.0, state.1, state.2))
-                .unwrap_or(&(0, 0, 0, 0, 0));
+                .unwrap();
 
             // Calculate the value function
             let v_t_x = rust::value_function::value_function_pol_eval(
@@ -336,11 +333,10 @@ fn policy_evaluation_par_opt(
                 &store_expectation,
                 &warehouse_expectation,
             );
-            // Update the value function
-
+            
             v.insert(state, v_t_x);
         });
-        //println!();
+        
     }
     let v_hm = v
         .clone()
@@ -411,7 +407,7 @@ fn optimal_policy_par(
         DashMap::new();
     // Iterate through periods
     for t in (1..periods).rev() {
-        //println!("Period: {:?}", t);
+        println!("Period: {:?}", t);
         // Save previous iteration (v_t+1)
         let v_plus_1 = v.clone();
         //v.clear(); // Reset V to repopulate
@@ -444,7 +440,7 @@ fn optimal_policy_par(
             // Store the optimal policy
             optimal_pol.insert((t, state.0, state.1, state.2), action);
         });
-        println!();
+
     }
     let optimal_pol_hm = optimal_pol
         .clone()

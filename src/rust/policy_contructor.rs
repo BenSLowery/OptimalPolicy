@@ -152,7 +152,7 @@ impl OptimalPolicy {
                         if order_st_b + new_state.2 < self.max_sb {
                             // Check if the order is valid
                             if order_st_a + order_st_b <= new_state.0 {
-                                for wh_order in 0..self.max_wh - new_state.0 {
+                                for wh_order in 0..self.max_wh - (new_state.0-order_st_a-order_st_b) {
                                     action_space.push((
                                         wh_order, order_st_a, order_st_b, t_a_to_b, t_b_to_a,
                                     ));
